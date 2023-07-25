@@ -2,11 +2,14 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { prompt } from 'enquirer';
 import { v4 as uuidv4 } from 'uuid';
-import { WJMAX_LEVELS } from './constants';
+import { WJMAX_BUTTON_TYPES, WJMAX_LEVELS } from './constants';
 
 const currentPath = process.cwd();
 
 interface PromptResponse {
+  songTitle: string;
+  singer: string;
+  buttonType: string;
   messiFileName: string;
   angelFileName: string;
   wakgoodFileName: string;
@@ -16,6 +19,7 @@ interface PromptResponse {
 interface LevelInfo {
   id: string;
   originalFileName: string;
+  videoTitle: string;
 }
 
 interface TrackResult {
@@ -34,35 +38,61 @@ async function main() {
 
   const uniqueFileNames = [...new Set(files.map((file) => file.name))];
 
-  const promptResponse = await prompt<PromptResponse>(
-    WJMAX_LEVELS.map((level) => ({
+  const promptResponse = await prompt<PromptResponse>([
+    {
+      type: 'input',
+      name: 'songTitle',
+      message: 'Enter a song title',
+    },
+    {
+      type: 'input',
+      name: 'singer',
+      message: "Enter a singer's name",
+    },
+    {
+      type: 'select',
+      name: 'buttonType',
+      message: 'Select the type of button',
+      choices: WJMAX_BUTTON_TYPES,
+    },
+    ...WJMAX_LEVELS.map((level) => ({
       type: 'select',
       name: `${level.toLowerCase()}FileName`,
-      message: `Select a filename for ${level} level`,
+      message: `Select the filename for ${level} level`,
       choices: ['<None>', ...uniqueFileNames],
-      result: (value) => value === '<None>' ? '' : value,
-    }))
-  );
+      result: (value: string) => value === '<None>' ? '' : value,
+    })),
+  ]);
 
-  const levelFileNames = [
-    promptResponse.messiFileName,
-    promptResponse.angelFileName,
-    promptResponse.wakgoodFileName,
-    promptResponse.minsuFileName,
+  const {
+    songTitle,
+    singer,
+    buttonType,
+    messiFileName,
+    angelFileName,
+    wakgoodFileName,
+    minsuFileName,
+  } = promptResponse;
+
+  const levels = [
+    { level: WJMAX_LEVELS[0], fileName: messiFileName },
+    { level: WJMAX_LEVELS[1], fileName: angelFileName },
+    { level: WJMAX_LEVELS[2], fileName: wakgoodFileName },
+    { level: WJMAX_LEVELS[3], fileName: minsuFileName },
   ];
 
   const trackResult: TrackResult = {
     levelInfo: {},
   };
 
-  levelFileNames.forEach((levelFileName) => {
-    if (!levelFileName) {
+  levels.forEach((level) => {
+    if (!level.fileName) {
       return;
     }
 
     const id = uuidv4();
 
-    files.filter((file) => file.name === levelFileName).forEach((file) => {
+    files.filter((file) => file.name === level.fileName).forEach((file) => {
       const oldPath = path.join(currentPath, file.fullName);
       const newPath = path.join(currentPath, `${id}${file.extension}`);
 
@@ -71,7 +101,8 @@ async function main() {
 
     trackResult.levelInfo[id] = {
       id,
-      originalFileName: levelFileName,
+      originalFileName: level.fileName,
+      videoTitle: `【WJMAX】 ${singer} — ${songTitle} [${buttonType} ${level.level}] PERFECT PLAY`,
     };
   });
 
